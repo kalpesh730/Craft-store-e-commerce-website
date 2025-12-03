@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CraftStore - Handmade Treasures</title>
+    
+    <!-- Tailwind CSS for Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Razorpay SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+    <!-- Markdown Parser (Marked) for AI text formatting if needed -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Poppins:wght@300;400;500;600&display=swap');
+
+        /* Base styles handled by Tailwind classes now */
+        
+        .drawer {
+            transition: transform 0.3s ease-in-out;
+            transform: translateX(100%);
+        }
+
+        .drawer-open {
+            transform: translateX(0);
+        }
+
+        .product-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        /* Modal Transition */
+        .modal {
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        .modal-open {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 60;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s, bottom 0.3s;
+        }
+
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+            bottom: 50px;
+        }
+
+        /* Loading Spinner */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 3px solid #ea580c;
+            width: 20px;
+            height: 20px;
+            -webkit-animation: spin 1s linear infinite; /* Safari */
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .sparkle-btn {
+            background: linear-gradient(45deg, #ea580c, #f97316, #ea580c);
+            background-size: 200% 200%;
+            animation: gradientBG 3s ease infinite;
+        }
+        
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+    </style>
+</head>
+<body class="text-stone-800 bg-[#fdfbf7] dark:bg-stone-900 dark:text-stone-100 transition-colors duration-300 relative">
+
+    <!-- Navigation -->
+    <nav class="sticky top-0 z-40 bg-white/90 dark:bg-stone-900/90 backdrop-blur-md shadow-sm border-b border-stone-100 dark:border-stone-800 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-20">
+                <!-- Logo -->
+                <div class="flex items-center cursor-pointer" onclick="scrollToSection('hero')">
+                    <i class="fa-solid fa-shapes text-orange-600 text-2xl mr-2"></i>
+                    <span class="text-2xl font-bold font-serif text-stone-800 dark:text-white">CraftStore</span>
+                </div>
+
+                <!-- Nav Icons -->
+                <div class="flex items-center space-x-3 md:space-x-5">
+                    <!-- AI Gift Finder Button -->
+                    <button onclick="openGiftFinder()" class="hidden md:flex items-center gap-2 bg-stone-100 dark:bg-stone-800 px-3 py-1.5 rounded-full text-sm font-medium hover:bg-orange-100 dark:hover:bg-stone-700 transition text-orange-600 dark:text-orange-400">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        Gift Finder
+                    </button>
+
+                    <a href="#" onclick="scrollToSection('catalog')" class="hidden lg:block text-stone-600 dark:text-stone-300 hover:text-orange-600 font-medium transition">Catalog</a>
+                    
+                    <!-- Dark Mode Toggle -->
+                    <button onclick="toggleTheme()" class="p-2 text-stone-600 dark:text-stone-300 hover:text-orange-600 transition" aria-label="Toggle Dark Mode">
+                        <i id="theme-icon" class="fa-solid fa-moon text-xl"></i>
+                    </button>
+
+                    <!-- Wishlist Btn -->
+                    <button onclick="openWishlist()" class="relative p-2 text-stone-600 dark:text-stone-300 hover:text-orange-600 transition" aria-label="Wishlist">
+                        <i class="fa-solid fa-heart text-xl"></i>
+                        <span id="wishlist-count" class="hidden absolute top-0 right-0 inline-flex items-center justify-center w-4 h-4 text-[10px] font-bold text-white bg-red-500 rounded-full transform translate-x-1/4 -translate-y-1/4">0</span>
+                    </button>
+
+                    <!-- Cart Btn -->
+                    <button id="cart-btn" class="relative p-2 text-stone-600 dark:text-stone-300 hover:text-orange-600 transition" aria-label="Cart">
+                        <i class="fa-solid fa-shopping-bag text-xl"></i>
+                        <span id="cart-count" class="hidden absolute top-0 right-0 inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-bold text-white bg-orange-600 rounded-full transform translate-x-1/4 -translate-y-1/4">0</span>
+                    </button>
+
+                    <!-- Login Btn -->
+                    <button id="login-btn" onclick="handleLoginClick()" class="p-2 text-stone-600 dark:text-stone-300 hover:text-orange-600 transition flex items-center gap-2">
+                        <i class="fa-regular fa-user text-xl"></i>
+                        <span id="user-name" class="hidden lg:inline text-sm font-medium">Login</span>
+                    </button>
+                    
+                    <!-- Mobile AI Btn (Icon only) -->
+                    <button onclick="openGiftFinder()" class="md:hidden text-orange-600 dark:text-orange-400">
+                        <i class="fa-solid fa-wand-magic-sparkles text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="hero" class="relative bg-stone-100 dark:bg-stone-800 py-20 lg:py-32 overflow-hidden transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+            <h1 class="text-4xl md:text-6xl font-bold text-stone-900 dark:text-white mb-6 leading-tight font-serif">
+                Authentic Handmade <br> <span class="text-orange-600">Treasures for You</span>
+            </h1>
+            <p class="mt-4 text-xl text-stone-600 dark:text-stone-300 max-w-2xl mx-auto mb-10">
+                Discover unique, artisanal products crafted with passion. 
+                Support independent creators and find the perfect gift.
+            </p>
+            <div class="flex justify-center gap-4">
+                <button onclick="scrollToSection('catalog')" class="bg-stone-900 dark:bg-white text-white dark:text-stone-900 px-8 py-4 rounded-full font-medium hover:bg-orange-600 dark:hover:bg-orange-600 dark:hover:text-white transition transform hover:scale-105 shadow-lg">
+                    Start Shopping
+                </button>
+                <button onclick="openGiftFinder()" class="bg-white dark:bg-stone-700 text-stone-900 dark:text-white border border-stone-200 dark:border-stone-600 px-8 py-4 rounded-full font-medium hover:border-orange-600 dark:hover:border-orange-500 transition flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-orange-600"></i> AI Gift Finder
+                </button>
+            </div>
+        </div>
+        <!-- Decorative bg circles -->
+        <div class="absolute top-0 left-0 -ml-20 -mt-20 w-64 h-64 rounded-full bg-orange-100 dark:bg-orange-900/20 opacity-50 blur-3xl"></div>
+        <div class="absolute bottom-0 right-0 -mr-20 -mb-20 w-80 h-80 rounded-full bg-stone-200 dark:bg-stone-700 opacity-50 blur-3xl"></div>
+    </section>
+
+    <!-- Catalog Section -->
+    <section id="catalog" class="py-16 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+            <h2 class="text-3xl font-bold text-stone-900 dark:text-white font-serif">Curated Collection</h2>
+            <div class="w-20 h-1 bg-orange-600 mx-auto mt-4 rounded-full"></div>
+        </div>
+        
+        <!-- Filter/Categories (Visual Only for MVP) -->
+        <div class="flex justify-center gap-4 mb-10 flex-wrap">
+            <button class="px-4 py-2 bg-stone-900 dark:bg-orange-600 text-white rounded-full text-sm transition">All</button>
+            <button class="px-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 rounded-full text-sm hover:border-orange-600 transition">Pottery</button>
+            <button class="px-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 rounded-full text-sm hover:border-orange-600 transition">Textiles</button>
+            <button class="px-4 py-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-300 rounded-full text-sm hover:border-orange-600 transition">Woodwork</button>
+        </div>
+
+        <!-- Product Grid -->
+        <div id="product-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <!-- Products will be injected here by JS -->
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-stone-900 text-stone-300 py-12 border-t border-stone-800">
+        <div class="max-w-7xl mx-auto px-4 text-center">
+            <div class="mb-4">
+                <i class="fa-solid fa-shapes text-orange-500 text-3xl"></i>
+            </div>
+            <p class="mb-4">© 2023 CraftStore MVP. Handcoded with ❤️.</p>
+            <div class="flex justify-center space-x-6 text-xl">
+                <a href="#" class="hover:text-white transition"><i class="fa-brands fa-instagram"></i></a>
+                <a href="#" class="hover:text-white transition"><i class="fa-brands fa-twitter"></i></a>
+                <a href="#" class="hover:text-white transition"><i class="fa-brands fa-pinterest"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Overlay (Shared for Cart & Wishlist & AI Modal) -->
+    <div id="overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 hidden transition-opacity opacity-0" onclick="closeAllDrawers()"></div>
+    
+    <!-- Cart Drawer -->
+    <div id="cart-sidebar" class="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white dark:bg-stone-900 z-50 shadow-2xl drawer flex flex-col transition-colors duration-300">
+        <div class="px-6 py-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-900">
+            <h2 class="text-xl font-bold font-serif dark:text-white">Your Cart</h2>
+            <button onclick="closeAllDrawers()" class="text-stone-400 hover:text-red-500 transition">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+        </div>
+
+        <div id="cart-items-container" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div id="empty-cart-msg" class="flex flex-col items-center justify-center h-full text-stone-400 dark:text-stone-600">
+                <i class="fa-solid fa-basket-shopping text-6xl mb-4 opacity-20"></i>
+                <p>Your cart is empty.</p>
+                <button onclick="closeAllDrawers()" class="mt-4 text-orange-600 font-medium hover:underline">Start Shopping</button>
+            </div>
+        </div>
+
+        <!-- AI Gift Note Generator Section -->
+        <div class="px-6 py-4 border-t border-stone-100 dark:border-stone-800 bg-orange-50 dark:bg-stone-800/50">
+            <button onclick="toggleGiftNotePanel()" class="flex items-center justify-between w-full text-left">
+                <span class="text-sm font-bold text-orange-700 dark:text-orange-400 flex items-center gap-2">
+                    <i class="fa-solid fa-feather-pointed"></i> Add a Gift Note? ✨
+                </span>
+                <i id="gift-chevron" class="fa-solid fa-chevron-down text-orange-700 dark:text-orange-400 text-xs transition-transform"></i>
+            </button>
+            
+            <div id="gift-note-panel" class="hidden mt-3 space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="gift-from" placeholder="From (Name)" class="text-xs p-2 rounded border border-orange-200 dark:border-stone-600 dark:bg-stone-700 dark:text-white">
+                    <input type="text" id="gift-to" placeholder="To (Name)" class="text-xs p-2 rounded border border-orange-200 dark:border-stone-600 dark:bg-stone-700 dark:text-white">
+                </div>
+                <input type="text" id="gift-occasion" placeholder="Occasion (e.g., Birthday, Wedding)" class="w-full text-xs p-2 rounded border border-orange-200 dark:border-stone-600 dark:bg-stone-700 dark:text-white">
+                <button onclick="generateGiftMessage()" id="gen-msg-btn" class="w-full bg-orange-600 text-white text-xs py-1.5 rounded hover:bg-orange-700 transition flex justify-center items-center gap-2">
+                    <span>Auto-Write Message ✨</span>
+                </button>
+                <textarea id="gift-message-text" rows="3" placeholder="Or type your own..." class="w-full text-sm p-2 rounded border border-orange-200 dark:border-stone-600 dark:bg-stone-700 dark:text-white focus:ring-1 focus:ring-orange-500 outline-none"></textarea>
+            </div>
+        </div>
+
+        <div class="p-6 border-t border-stone-100 dark:border-stone-800 bg-stone-50 dark:bg-stone-900">
+            <div class="flex justify-between items-center mb-4 text-lg font-bold text-stone-900 dark:text-white">
+                <span>Total</span>
+                <span id="cart-total">₹0</span>
+            </div>
+            <button id="checkout-btn" class="w-full bg-stone-900 dark:bg-orange-600 text-white py-3 rounded-lg font-medium hover:bg-orange-600 dark:hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Proceed to Checkout
+            </button>
+            <p class="text-xs text-center text-stone-400 mt-3">Secured by Razorpay</p>
+        </div>
+    </div>
+
+    <!-- Wishlist Drawer -->
+    <div id="wishlist-sidebar" class="fixed top-0 right-0 h-full w-full sm:w-[400px] bg-white dark:bg-stone-900 z-50 shadow-2xl drawer flex flex-col transition-colors duration-300">
+        <div class="px-6 py-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-900">
+            <h2 class="text-xl font-bold font-serif dark:text-white">Your Wishlist</h2>
+            <button onclick="closeAllDrawers()" class="text-stone-400 hover:text-red-500 transition">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+        </div>
+
+        <div id="wishlist-items-container" class="flex-1 overflow-y-auto p-6 space-y-6">
+            <div id="empty-wishlist-msg" class="flex flex-col items-center justify-center h-full text-stone-400 dark:text-stone-600">
+                <i class="fa-regular fa-heart text-6xl mb-4 opacity-20"></i>
+                <p>Your wishlist is empty.</p>
+            </div>
+            <!-- Wishlist items injected here -->
+        </div>
+    </div>
+
+    <!-- AI Gift Finder Modal -->
+    <div id="ai-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAiModal()"></div>
+        <div class="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-2xl relative z-10 overflow-hidden transform transition-all scale-95 opacity-0 duration-300 flex flex-col max-h-[85vh]" id="ai-content">
+            <!-- Header -->
+            <div class="p-6 border-b border-stone-100 dark:border-stone-700 bg-orange-50 dark:bg-stone-900/50">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <h2 class="text-2xl font-bold font-serif text-stone-900 dark:text-white flex items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles text-orange-600"></i> AI Gift Finder
+                        </h2>
+                        <p class="text-stone-500 dark:text-stone-400 text-sm mt-1">Describe who you are shopping for, and let Gemini curate the perfect gift.</p>
+                    </div>
+                    <button onclick="closeAiModal()" class="text-stone-400 hover:text-stone-600 dark:hover:text-white">
+                        <i class="fa-solid fa-xmark text-xl"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chat Area -->
+            <div id="ai-results-area" class="flex-1 overflow-y-auto p-6 bg-stone-50 dark:bg-stone-900 space-y-4">
+                <!-- Initial State -->
+                <div id="ai-initial-state" class="text-center py-8">
+                    <div class="inline-block p-4 rounded-full bg-white dark:bg-stone-800 shadow-sm mb-4">
+                        <i class="fa-solid fa-gift text-4xl text-orange-300"></i>
+                    </div>
+                    <h3 class="text-lg font-medium text-stone-800 dark:text-white">Who is the lucky recipient?</h3>
+                    <p class="text-sm text-stone-500 dark:text-stone-400 mt-2">Try: "My mom who loves gardening", "A wedding gift for a boho couple", or "Something under ₹1000 for a workspace".</p>
+                </div>
+                
+                <!-- Loading State (Hidden by default) -->
+                <div id="ai-loading" class="hidden flex-col items-center justify-center py-10">
+                    <div class="loader mb-4"></div>
+                    <p class="text-sm text-stone-500 animate-pulse">Curating specific treasures for you...</p>
+                </div>
+
+                <!-- Results Container -->
+                <div id="ai-recommendations" class="space-y-6 hidden">
+                    <!-- Dynamic Content -->
+                </div>
+            </div>
+
+            <!-- Input Area -->
+            <div class="p-4 border-t border-stone-100 dark:border-stone-700 bg-white dark:bg-stone-800">
+                <div class="flex gap-2">
+                    <input type="text" id="ai-prompt-input" placeholder="e.g., A housewarming gift for someone who likes minimalism..." 
+                        class="flex-1 px-4 py-3 rounded-xl border border-stone-200 dark:border-stone-600 bg-stone-50 dark:bg-stone-700 text-stone-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none transition"
+                        onkeypress="if(event.key === 'Enter') runGiftFinder()">
+                    <button onclick="runGiftFinder()" class="sparkle-btn text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:opacity-90 transition transform active:scale-95 flex items-center justify-center">
+                        <i class="fa-solid fa-arrow-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 modal">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="toggleLoginModal()"></div>
+        <div class="bg-white dark:bg-stone-800 rounded-2xl shadow-2xl w-full max-w-md relative z-10 overflow-hidden transform transition-all scale-95 opacity-0 duration-300" id="login-content">
+            <div class="p-8">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold font-serif text-stone-900 dark:text-white">Welcome Back</h2>
+                    <p class="text-stone-500 dark:text-stone-400 text-sm mt-1">Sign in to access your saved items</p>
+                </div>
+                
+                <form onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Email Address</label>
+                        <input type="email" required placeholder="hello@example.com" class="w-full px-4 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">Password</label>
+                        <input type="password" required placeholder="••••••••" class="w-full px-4 py-2 rounded-lg border border-stone-200 dark:border-stone-600 bg-white dark:bg-stone-700 text-stone-900 dark:text-white focus:ring-2 focus:ring-orange-500 outline-none transition">
+                    </div>
+                    <button type="submit" class="w-full bg-stone-900 dark:bg-orange-600 text-white py-3 rounded-lg font-medium hover:bg-orange-600 dark:hover:bg-orange-700 transition shadow-lg mt-2">
+                        Sign In
+                    </button>
+                </form>
+                
+                <div class="mt-6 text-center text-xs text-stone-400">
+                    <p>Don't have an account? <a href="#" class="text-orange-600 hover:underline">Sign up</a></p>
+                </div>
+            </div>
+            <button onclick="toggleLoginModal()" class="absolute top-4 right-4 text-stone-400 hover:text-stone-600 dark:hover:text-white">
+                <i class="fa-solid fa-xmark text-xl"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast shadow-lg">Notification Message</div>
+
+    <script>
+        // --- 1. Data Mock ---
+        const products = [
+            { id: 1, name: "Ceramic Minimalist Vase", price: 1299, image: "https://images.unsplash.com/photo-1610701596007-11502861dcfa?q=80&w=400&auto=format&fit=crop", category: "Pottery" },
+            { id: 2, name: "Handwoven Jute Basket", price: 850, image: "j1.png", category: "Textiles" },
+            { id: 3, name: "Olive Wood Cutting Board", price: 2400, image: "2.png", category: "Woodwork" },
+            { id: 4, name: "Abstract Clay Sculpture", price: 3500, image: "https://images.unsplash.com/photo-1515488764276-beab7607c1e6?q=80&w=400&auto=format&fit=crop", category: "Pottery" },
+            { id: 5, name: "Macrame Wall Hanging", price: 1800, image: "https://images.unsplash.com/photo-1519710889408-a67e1c7e0452?q=80&w=400&auto=format&fit=crop", category: "Textiles" },
+            { id: 6, name: "Hand-Carved Spoon Set", price: 650, image: "3.png", category: "Woodwork" },
+            { id: 7, name: "Soy Wax Candle", price: 450, image: "4.png", category: "Decor" },
+            { id: 8, name: "Linen Table Runner", price: 1100, image: "l1.png", category: "Textiles" }
+        ];
+
+        // --- 2. State ---
+        let cart = [];
+        let wishlist = [];
+        let isLoggedIn = false;
+        let isDarkMode = false;
+
+        // --- 3. DOM Elements ---
+        const productGrid = document.getElementById('product-grid');
+        const cartSidebar = document.getElementById('cart-sidebar');
+        const wishlistSidebar = document.getElementById('wishlist-sidebar');
+        const overlay = document.getElementById('overlay');
+        const cartItemsContainer = document.getElementById('cart-items-container');
+        const wishlistItemsContainer = document.getElementById('wishlist-items-container');
+        const emptyCartMsg = document.getElementById('empty-cart-msg');
+        const emptyWishlistMsg = document.getElementById('empty-wishlist-msg');
+        const cartCountBadge = document.getElementById('cart-count');
+        const wishlistCountBadge = document.getElementById('wishlist-count');
+        const cartTotalEl = document.getElementById('cart-total');
+        const checkoutBtn = document.getElementById('checkout-btn');
+        const toast = document.getElementById('toast');
+        const loginModal = document.getElementById('login-modal');
+        const loginContent = document.getElementById('login-content');
+        
+        // AI Elements
+        const aiModal = document.getElementById('ai-modal');
+        const aiContent = document.getElementById('ai-content');
+        const aiInitialState = document.getElementById('ai-initial-state');
+        const aiLoading = document.getElementById('ai-loading');
+        const aiRecommendations = document.getElementById('ai-recommendations');
+        const aiInput = document.getElementById('ai-prompt-input');
+
+        // --- 4. Initialization ---
+        function init() {
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                toggleTheme(true);
+            }
+            renderProducts();
+            updateCartUI();
+            updateWishlistUI();
+            updateLoginUI();
+        }
+
+        // --- 5. Theme Logic ---
+        function toggleTheme(forceDark = null) {
+            const html = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            
+            if (forceDark === true || (forceDark === null && !isDarkMode)) {
+                html.classList.add('dark');
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                isDarkMode = true;
+            } else {
+                html.classList.remove('dark');
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                isDarkMode = false;
+            }
+        }
+
+        // --- 6. Render Products ---
+        function renderProducts() {
+            productGrid.innerHTML = products.map(product => {
+                const isInWishlist = wishlist.includes(product.id);
+                const heartClass = isInWishlist ? "fa-solid text-red-500" : "fa-regular text-stone-400 hover:text-red-500";
+                
+                return `
+                <div class="product-card bg-white dark:bg-stone-800 rounded-xl overflow-hidden border border-stone-100 dark:border-stone-700 shadow-sm hover:shadow-lg transition duration-300">
+                    <div class="relative h-64 overflow-hidden group">
+                        <img src="${product.image}" alt="${product.name}" class="w-full h-full object-cover transition duration-500 group-hover:scale-110">
+                        <div class="absolute top-3 right-3 flex flex-col gap-2">
+                            <button onclick="toggleWishlist(${product.id})" class="bg-white dark:bg-stone-900 p-2.5 rounded-full shadow-md hover:scale-110 transition z-10">
+                                <i class="${heartClass} text-lg" id="heart-${product.id}"></i>
+                            </button>
+                        </div>
+                        <button onclick="addToCart(${product.id})" class="absolute bottom-4 right-4 bg-white dark:bg-stone-900 text-stone-900 dark:text-white p-3 rounded-full shadow-md hover:bg-orange-600 hover:text-white dark:hover:bg-orange-600 transition transform translate-y-12 group-hover:translate-y-0 z-10">
+                            <i class="fa-solid fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="p-6">
+                        <span class="text-xs font-semibold text-orange-600 uppercase tracking-wider">${product.category}</span>
+                        <h3 class="text-lg font-bold text-stone-900 dark:text-white mt-1 line-clamp-1">${product.name}</h3>
+                        <div class="flex justify-between items-center mt-4">
+                            <span class="text-lg font-medium text-stone-700 dark:text-stone-300">₹${product.price}</span>
+                            <button onclick="addToCart(${product.id})" class="text-sm font-medium text-stone-500 dark:text-stone-400 hover:text-stone-900 dark:hover:text-white underline">Add to Cart</button>
+                        </div>
+                    </div>
+                </div>
+            `}).join('');
+        }
+
+        // --- 7. Wishlist & Cart Logic (Same as before) ---
+        function toggleWishlist(productId) {
+            const index = wishlist.indexOf(productId);
+            const heartIcon = document.getElementById(`heart-${productId}`);
+            
+            if (index === -1) {
+                wishlist.push(productId);
+                if (heartIcon) {
+                    heartIcon.classList.remove('fa-regular', 'text-stone-400');
+                    heartIcon.classList.add('fa-solid', 'text-red-500');
+                }
+                showToast("Added to Wishlist");
+            } else {
+                wishlist.splice(index, 1);
+                if (heartIcon) {
+                    heartIcon.classList.remove('fa-solid', 'text-red-500');
+                    heartIcon.classList.add('fa-regular', 'text-stone-400');
+                }
+                showToast("Removed from Wishlist");
+            }
+            updateWishlistUI();
+        }
+
+        function updateWishlistUI() {
+            wishlistCountBadge.innerText = wishlist.length;
+            wishlistCountBadge.classList.toggle('hidden', wishlist.length === 0);
+
+            if (wishlist.length === 0) {
+                wishlistItemsContainer.innerHTML = '';
+                wishlistItemsContainer.appendChild(emptyWishlistMsg);
+                emptyWishlistMsg.style.display = 'flex';
+            } else {
+                emptyWishlistMsg.style.display = 'none';
+                wishlistItemsContainer.innerHTML = wishlist.map(id => {
+                    const item = products.find(p => p.id === id);
+                    return `
+                    <div class="flex gap-4 p-2 bg-white dark:bg-stone-800 rounded-lg shadow-sm border border-stone-100 dark:border-stone-700">
+                        <div class="w-16 h-16 flex-shrink-0 rounded-md overflow-hidden">
+                            <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="flex-1 flex flex-col justify-center">
+                            <h4 class="font-bold text-sm text-stone-900 dark:text-white line-clamp-1">${item.name}</h4>
+                            <p class="text-xs text-stone-500 dark:text-stone-400">₹${item.price}</p>
+                            <div class="mt-2 flex gap-3">
+                                <button onclick="addToCart(${item.id}); openCart()" class="text-xs text-orange-600 font-medium hover:underline">Add to Cart</button>
+                                <button onclick="toggleWishlist(${item.id})" class="text-xs text-red-500 hover:text-red-700">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                `}).join('');
+            }
+        }
+
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            const existingItem = cart.find(item => item.id === productId);
+
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+
+            updateCartUI();
+            openCart();
+            showToast(`Added ${product.name}`);
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            updateCartUI();
+        }
+
+        function changeQuantity(productId, change) {
+            const item = cart.find(item => item.id === productId);
+            if (item) {
+                item.quantity += change;
+                if (item.quantity <= 0) {
+                    removeFromCart(productId);
+                } else {
+                    updateCartUI();
+                }
+            }
+        }
+
+        function updateCartUI() {
+            const totalCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+            cartCountBadge.innerText = totalCount;
+            cartCountBadge.classList.toggle('hidden', totalCount === 0);
+
+            const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            cartTotalEl.innerText = `₹${totalAmount}`;
+
+            if (cart.length === 0) {
+                cartItemsContainer.innerHTML = '';
+                cartItemsContainer.appendChild(emptyCartMsg);
+                emptyCartMsg.style.display = 'flex';
+                checkoutBtn.disabled = true;
+            } else {
+                emptyCartMsg.style.display = 'none';
+                checkoutBtn.disabled = false;
+                cartItemsContainer.innerHTML = cart.map(item => `
+                    <div class="flex gap-4">
+                        <div class="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border border-stone-200 dark:border-stone-700">
+                            <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">
+                        </div>
+                        <div class="flex-1 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-bold text-stone-900 dark:text-white line-clamp-1">${item.name}</h4>
+                                <p class="text-sm text-stone-500 dark:text-stone-400">₹${item.price}</p>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center border border-stone-200 dark:border-stone-600 rounded-lg bg-white dark:bg-stone-800">
+                                    <button onclick="changeQuantity(${item.id}, -1)" class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300">-</button>
+                                    <span class="px-2 text-sm font-medium text-stone-900 dark:text-white">${item.quantity}</span>
+                                    <button onclick="changeQuantity(${item.id}, 1)" class="px-2 py-1 hover:bg-stone-100 dark:hover:bg-stone-700 text-stone-600 dark:text-stone-300">+</button>
+                                </div>
+                                <button onclick="removeFromCart(${item.id})" class="text-xs text-red-500 hover:text-red-700 font-medium">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        // --- 8. Gemini API Integration ---
+
+        const apiKey = ""; // Set by environment
+
+        async function callGemini(prompt, systemInstruction = "", jsonMode = false) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined,
+                generationConfig: jsonMode ? { responseMimeType: "application/json" } : undefined
+            };
+
+            // Simple retry logic (exponential backoff)
+            const delays = [1000, 2000, 4000];
+            for (let i = 0; i <= delays.length; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    
+                    const data = await response.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                } catch (error) {
+                    if (i === delays.length) throw error; // Rethrow last error
+                    await new Promise(res => setTimeout(res, delays[i]));
+                }
+            }
+        }
+
+        // --- 8.1 Gift Finder Logic ---
+        function openGiftFinder() {
+            aiModal.classList.add('modal-open');
+            setTimeout(() => {
+                aiContent.classList.remove('scale-95', 'opacity-0');
+                aiContent.classList.add('scale-100', 'opacity-100');
+            }, 10);
+            aiInput.focus();
+        }
+
+        function closeAiModal() {
+            aiContent.classList.remove('scale-100', 'opacity-100');
+            aiContent.classList.add('scale-95', 'opacity-0');
+            setTimeout(() => {
+                aiModal.classList.remove('modal-open');
+            }, 300);
+        }
+
+        async function runGiftFinder() {
+            const query = aiInput.value.trim();
+            if (!query) return;
+
+            // UI State Updates
+            aiInitialState.classList.add('hidden');
+            aiRecommendations.classList.add('hidden');
+            aiLoading.classList.remove('hidden');
+            aiLoading.style.display = 'flex'; // Ensure flex display
+
+            // Construct System Prompt with Products
+            const productContext = JSON.stringify(products.map(p => ({ id: p.id, name: p.name, category: p.category, price: p.price })));
+            
+            const systemPrompt = `You are a helpful sales assistant for CraftStore. We sell handmade goods.
+            Here is our catalog: ${productContext}.
+            Your goal is to recommend 1-3 products based on the user's description.
+            
+            Return a valid JSON object with this structure:
+            {
+                "recommendations": [
+                    { "id": 1, "reason": "Why this fits" } 
+                ],
+                "message": "A warm, short closing sentence."
+            }
+            Only return products that exist in the catalog. If nothing fits perfectly, pick the closest match.`;
+
+            try {
+                const responseText = await callGemini(query, systemPrompt, true);
+                const data = JSON.parse(responseText);
+                
+                renderAiResults(data);
+            } catch (error) {
+                console.error(error);
+                renderAiError();
+            }
+        }
+
+        function renderAiResults(data) {
+            aiLoading.classList.add('hidden');
+            aiLoading.style.display = 'none';
+            aiRecommendations.innerHTML = '';
+            aiRecommendations.classList.remove('hidden');
+
+            // Render Message
+            const msgEl = document.createElement('div');
+            msgEl.className = "bg-orange-50 dark:bg-orange-900/20 p-4 rounded-lg text-sm text-stone-700 dark:text-stone-300 italic mb-4 border border-orange-100 dark:border-orange-800";
+            msgEl.innerText = data.message || "Here are some treasures I found for you.";
+            aiRecommendations.appendChild(msgEl);
+
+            // Render Products
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(rec => {
+                    const product = products.find(p => p.id === rec.id);
+                    if (product) {
+                        const card = document.createElement('div');
+                        card.className = "flex flex-col sm:flex-row gap-4 p-4 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl shadow-sm";
+                        card.innerHTML = `
+                            <img src="${product.image}" class="w-full sm:w-24 h-32 sm:h-24 object-cover rounded-lg">
+                            <div class="flex-1">
+                                <h4 class="font-bold text-stone-900 dark:text-white">${product.name}</h4>
+                                <p class="text-xs text-orange-600 font-semibold mb-1">₹${product.price}</p>
+                                <p class="text-sm text-stone-600 dark:text-stone-400 mb-3">${rec.reason}</p>
+                                <button onclick="addToCart(${product.id}); closeAiModal()" class="text-xs bg-stone-900 dark:bg-white text-white dark:text-stone-900 px-3 py-1.5 rounded-full hover:opacity-90">
+                                    Add to Cart
+                                </button>
+                            </div>
+                        `;
+                        aiRecommendations.appendChild(card);
+                    }
+                });
+            }
+        }
+
+        function renderAiError() {
+            aiLoading.classList.add('hidden');
+            aiLoading.style.display = 'none';
+            aiRecommendations.innerHTML = `
+                <div class="text-center p-6 text-stone-500">
+                    <p>My magic wand sputtered! Please try again.</p>
+                </div>
+            `;
+            aiRecommendations.classList.remove('hidden');
+        }
+
+        // --- 8.2 Gift Note Logic ---
+        function toggleGiftNotePanel() {
+            const panel = document.getElementById('gift-note-panel');
+            const chevron = document.getElementById('gift-chevron');
+            panel.classList.toggle('hidden');
+            if (panel.classList.contains('hidden')) {
+                chevron.style.transform = 'rotate(0deg)';
+            } else {
+                chevron.style.transform = 'rotate(180deg)';
+            }
+        }
+
+        async function generateGiftMessage() {
+            const from = document.getElementById('gift-from').value;
+            const to = document.getElementById('gift-to').value;
+            const occasion = document.getElementById('gift-occasion').value;
+            const btn = document.getElementById('gen-msg-btn');
+            const textArea = document.getElementById('gift-message-text');
+
+            if (!occasion) {
+                showToast("Please enter an occasion!");
+                return;
+            }
+
+            // Loading state
+            const originalBtnContent = btn.innerHTML;
+            btn.innerHTML = `<div class="loader w-3 h-3 border-white border-t-transparent mr-2"></div> Writing...`;
+            btn.disabled = true;
+
+            const prompt = `Write a short, warm, and creative gift note (max 40 words).
+            To: ${to || 'A friend'}
+            From: ${from || 'Me'}
+            Occasion: ${occasion}
+            Tone: Sincere and slightly poetic.`;
+
+            try {
+                const message = await callGemini(prompt);
+                textArea.value = message;
+            } catch (err) {
+                showToast("Failed to generate message.");
+                console.error(err);
+            } finally {
+                btn.innerHTML = originalBtnContent;
+                btn.disabled = false;
+            }
+        }
+
+        // --- 9. Login & Other Logic (Preserved) ---
+        function handleLoginClick() {
+            if (isLoggedIn) {
+                isLoggedIn = false;
+                showToast("Logged out successfully");
+                updateLoginUI();
+            } else {
+                toggleLoginModal();
+            }
+        }
+
+        function toggleLoginModal() {
+            if (loginModal.classList.contains('modal-open')) {
+                loginContent.classList.remove('scale-100', 'opacity-100');
+                loginContent.classList.add('scale-95', 'opacity-0');
+                setTimeout(() => {
+                    loginModal.classList.remove('modal-open');
+                }, 300);
+            } else {
+                loginModal.classList.add('modal-open');
+                setTimeout(() => {
+                    loginContent.classList.remove('scale-95', 'opacity-0');
+                    loginContent.classList.add('scale-100', 'opacity-100');
+                }, 10);
+            }
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            setTimeout(() => {
+                isLoggedIn = true;
+                toggleLoginModal();
+                updateLoginUI();
+                showToast("Welcome back!");
+            }, 800);
+        }
+
+        function updateLoginUI() {
+            const btn = document.getElementById('login-btn');
+            if (isLoggedIn) {
+                btn.innerHTML = `<i class="fa-solid fa-user-check text-xl text-green-600"></i> <span class="hidden lg:inline text-sm font-medium">Logout</span>`;
+            } else {
+                btn.innerHTML = `<i class="fa-regular fa-user text-xl"></i> <span class="hidden lg:inline text-sm font-medium">Login</span>`;
+            }
+        }
+
+        function openCart() {
+            closeAllDrawers();
+            cartSidebar.classList.add('drawer-open');
+            overlay.classList.remove('hidden');
+            setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function openWishlist() {
+            closeAllDrawers();
+            wishlistSidebar.classList.add('drawer-open');
+            overlay.classList.remove('hidden');
+            setTimeout(() => overlay.classList.remove('opacity-0'), 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeAllDrawers() {
+            cartSidebar.classList.remove('drawer-open');
+            wishlistSidebar.classList.remove('drawer-open');
+            overlay.classList.add('opacity-0');
+            setTimeout(() => overlay.classList.add('hidden'), 300);
+            document.body.style.overflow = '';
+        }
+
+        function scrollToSection(id) {
+            const el = document.getElementById(id);
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function showToast(message) {
+            toast.innerText = message;
+            toast.className = "toast show";
+            setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, 3000);
+        }
+
+        document.getElementById('cart-btn').addEventListener('click', openCart);
+
+        checkoutBtn.addEventListener('click', function(e) {
+            if (!isLoggedIn) {
+                showToast("Please login to checkout");
+                toggleLoginModal();
+                closeAllDrawers();
+                return;
+            }
+
+            e.preventDefault();
+            const totalAmount = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            
+            var options = {
+                "key": "YOUR_RAZORPAY_KEY_ID", 
+                "amount": totalAmount * 100, 
+                "currency": "INR",
+                "name": "CraftStore",
+                "description": "Purchase of Handmade Goods",
+                "image": "https://cdn-icons-png.flaticon.com/512/869/869636.png",
+                "handler": function (response){
+                    cart = [];
+                    updateCartUI();
+                    closeAllDrawers();
+                    alert("Payment Successful! ID: " + response.razorpay_payment_id);
+                },
+                "prefill": { "email": "customer@example.com", "contact": "9999999999" },
+                "theme": { "color": "#ea580c" }
+            };
+            
+            try {
+                var rzp1 = new Razorpay(options);
+                rzp1.on('payment.failed', function (response){ alert("Payment Failed"); });
+                rzp1.open();
+            } catch (err) {
+                console.error("Razorpay Error:", err);
+                alert("Simulated Payment Success (Key missing).");
+                cart = [];
+                updateCartUI();
+                closeAllDrawers();
+            }
+        });
+
+        init();
+
+    </script>
+</body>
+</html>
